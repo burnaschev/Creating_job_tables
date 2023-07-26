@@ -1,41 +1,37 @@
-import time
 from typing import Any
 
 import psycopg2
 import requests
 
-API_HH_COMPANIES = 'https://api.hh.ru/employers'
-TIME = 0.1
+API_HH_COMPANIES = 'https://api.hh.ru/employers/'
 DB_NAME = "data"
 
 
-def get_companies() -> list[dict[str, Any]]:
+def get_companies(companies: list) -> list[dict[str, Any]]:
     """Получение списка работодателей и их вакансий с платформы HeadHunter"""
-    companies = []
-    for page in range(10):
-        time.sleep(TIME)
-        params = {
-            'per_page': 100,
-            "page": page
-        }
-        response = requests.get(API_HH_COMPANIES, params=params)
-        items_json = [item for item in response.json()['items'] if int(item['open_vacancies']) > 0]
-        companies.extend(items_json)
-    return companies[0:10]
+    companies_list = []
+    for company in companies:
+        url = f'{API_HH_COMPANIES}{company}'
+        companies_response = requests.get(url).json()
+        vacancy_response = requests.get(companies_response['vacancies_url']).json()
+        companies_list.append({
+            'company': companies_response,
+            'vacancies': vacancy_response['items']
+        })
+
+    return companies_list
 
 
-def sorted_companies_vacancy(company_list: list) -> list[dict[str, Any]]:
-    """Получение списка вакансий работодателей"""
-    params = {
-        'per_page': 100,
-        "page": 0
-    }
-    for company in company_list:
-        time.sleep(TIME)
-        response = requests.get(company['vacancies_url'], params=params)
-        items_json = response.json()
-        company['vacancies'] = items_json['items']
-    return company_list
+def filter_salary(salary):
+    """Применяем фильтр для заработной платы"""
+    if salary is not None:
+        if salary['from'] is not None and salary['to'] is not None:
+            return round((salary['from'] + salary['to']) / 2)
+        elif salary['from'] is not None:
+            return salary['from']
+        elif salary['to'] is not None:
+            return salary['to']
+    return None
 
 
 def create_database(params: dict) -> None:
@@ -61,8 +57,7 @@ def create_database(params: dict) -> None:
                             vacancy_id SERIAL PRIMARY KEY,
                             company_id int REFERENCES companies(company_id),
                             title VARCHAR(255) NOT NULL,
-                            salary_to INTEGER,
-                            salary_from INTEGER,
+                            salary INTEGER,
                             url TEXT NOT NULL 
                         )
                     """)
@@ -82,15 +77,14 @@ def save_data_to_database(data: list[dict[str, Any]], params: dict) -> None:
                 VALUES (%s)
                 RETURNING company_id
                 """,
-                (company['name'],))
+                (company['company']['name'],))
             company_id = int(cur.fetchone()[0])
             for vacancy in company['vacancies']:
+                salary = filter_salary(vacancy['salary'])
                 cur.execute("""
-                INSERT INTO vacancies (company_id, title, salary_to, salary_from, url)
-                VALUES (%s, %s, %s, %s, %s)""",
-                            (company_id, vacancy['name'],
-                             int(vacancy['salary']['from']) if vacancy['salary']['from'] else None,
-                             int(vacancy['salary']['to']) if vacancy['salary']['to'] else None,
+                INSERT INTO vacancies (company_id, title, salary, url)
+                VALUES (%s, %s, %s, %s)""",
+                            (company_id, vacancy['name'], salary,
                              vacancy['alternate_url']))
     conn.commit()
     conn.close()
