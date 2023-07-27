@@ -4,7 +4,6 @@ import psycopg2
 import requests
 
 API_HH_COMPANIES = 'https://api.hh.ru/employers/'
-DB_NAME = "data"
 
 
 def get_companies(companies: list) -> list[dict[str, Any]]:
@@ -34,16 +33,16 @@ def filter_salary(salary):
     return None
 
 
-def create_database(params: dict) -> None:
+def create_database(db_name: str, params: dict) -> None:
     """Создание базы данных"""
     conn = psycopg2.connect(**params)
     conn.autocommit = True
     with conn.cursor() as cur:
-        cur.execute(f"DROP DATABASE IF EXISTS {DB_NAME}")
-        cur.execute(f"CREATE DATABASE {DB_NAME}")
+        cur.execute(f"DROP DATABASE IF EXISTS {db_name}")
+        cur.execute(f"CREATE DATABASE {db_name}")
     conn.close()
 
-    conn = psycopg2.connect(dbname=DB_NAME, **params)
+    conn = psycopg2.connect(dbname=db_name, **params)
     with conn.cursor() as cur:
         cur.execute("""
                     CREATE TABLE companies (
@@ -65,9 +64,9 @@ def create_database(params: dict) -> None:
     conn.close()
 
 
-def save_data_to_database(data: list[dict[str, Any]], params: dict) -> None:
-    """Добавление информаций по вакансиям в таблицу"""
-    conn = psycopg2.connect(dbname=DB_NAME, **params)
+def save_data_to_database(data: list[dict[str, Any]], db_name: str, params: dict) -> None:
+    """Добавление информаций по вакансиям и компаниям в таблицы"""
+    conn = psycopg2.connect(dbname=db_name, **params)
 
     with conn.cursor() as cur:
         for company in data:
