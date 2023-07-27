@@ -48,7 +48,7 @@ def create_database(params: dict) -> None:
         cur.execute("""
                     CREATE TABLE companies (
                         company_id SERIAL PRIMARY KEY,
-                        title VARCHAR(255) NOT NULL
+                        company_title VARCHAR(255) NOT NULL
                     )
                 """)
 
@@ -56,7 +56,7 @@ def create_database(params: dict) -> None:
                         CREATE TABLE vacancies (
                             vacancy_id SERIAL PRIMARY KEY,
                             company_id int REFERENCES companies(company_id),
-                            title VARCHAR(255) NOT NULL,
+                            vacancy_title VARCHAR(255) NOT NULL,
                             salary INTEGER,
                             url TEXT NOT NULL 
                         )
@@ -73,7 +73,7 @@ def save_data_to_database(data: list[dict[str, Any]], params: dict) -> None:
         for company in data:
             cur.execute(
                 """
-                INSERT INTO companies (title)
+                INSERT INTO companies (company_title)
                 VALUES (%s)
                 RETURNING company_id
                 """,
@@ -82,7 +82,7 @@ def save_data_to_database(data: list[dict[str, Any]], params: dict) -> None:
             for vacancy in company['vacancies']:
                 salary = filter_salary(vacancy['salary'])
                 cur.execute("""
-                INSERT INTO vacancies (company_id, title, salary, url)
+                INSERT INTO vacancies (company_id, vacancy_title, salary, url)
                 VALUES (%s, %s, %s, %s)""",
                             (company_id, vacancy['name'], salary,
                              vacancy['alternate_url']))
